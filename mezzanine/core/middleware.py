@@ -175,7 +175,8 @@ class UpdateCacheMiddleware(MiddlewareMixin):
         response["Content-Length"] = len(response.content)
         if hasattr(request, '_messages'):
             # Required to clear out user messages.
-            request._messages.update(response)
+            if(hasattr(request, "_messages")):
+                request._messages.update(response)
         # Response needs to be run-through the CSRF middleware again so
         # that if there was a {% csrf_token %} inside of the nevercache
         # the cookie will be correctly set for the the response
