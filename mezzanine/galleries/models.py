@@ -48,6 +48,14 @@ class BaseGallery(models.Model):
         help_text=_("Upload a zip file containing images, and "
                     "they'll be imported into this gallery."))
 
+
+    class Meta:
+        verbose_name = _("Gallery")
+        verbose_name_plural = _("Galleries")
+
+    def ordered_children(self):
+        return self.children.order_by("_order")
+
     def save(self, delete_zip_import=True, *args, **kwargs):
         """
         If a zip file is uploaded, extract any images from it and add
