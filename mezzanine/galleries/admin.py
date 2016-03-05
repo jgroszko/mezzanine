@@ -17,5 +17,6 @@ class GalleryAdmin(PageAdmin):
         js = {static("mezzanine/js/admin/gallery.js"),}
 
     inlines = (GalleryImageInline,)
+    exclude = ('zip_import',)
 
 admin.site.register(Gallery, GalleryAdmin)
