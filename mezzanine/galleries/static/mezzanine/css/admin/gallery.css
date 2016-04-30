@@ -1,6 +1,6 @@
 .inline-group .vTextField {width:700px !important;}
 
-#zip-import-file
+.form-row.field-zip_import
 {
     display: none;
 }
