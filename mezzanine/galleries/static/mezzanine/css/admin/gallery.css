@@ -1,7 +1,7 @@
 .inline-group .vTextField {width:700px !important;}
 
 .form-row.field-zip_import,
-#file-input-zip
+#zip-import-file
 {
     display: none;
 }
