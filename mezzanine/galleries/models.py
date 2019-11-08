@@ -2,15 +2,23 @@ from __future__ import unicode_literals
 from future.builtins import str
 from future.utils import native
 
+import base64
+import logging
+import pytz
+import datetime
 from io import BytesIO
 import os
 from string import punctuation
 from zipfile import ZipFile
 from chardet import detect as charsetdetect
 
+from PIL import Image
+from PIL.ExifTags import TAGS
+
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import models
+from django.contrib.postgres.fields import JSONField
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils.encoding import force_text
 from django.utils.translation import ugettext_lazy as _
@@ -22,6 +30,18 @@ from mezzanine.pages.models import Page
 from mezzanine.utils.importing import import_dotted_path
 from mezzanine.utils.models import upload_to
 
+logger = logging.getLogger(__name__)
+
+def get_exif(image):
+    result = {}
+    info = image._getexif()
+    for tag, value in info.items():
+        decoded = TAGS.get(tag, tag)
+        if isinstance(value, bytes):
+            result[decoded] = base64.b64encode(value).decode('utf-8')
+        else:
+            result[decoded] = value
+    return result
 
 # Set the directory where gallery images are uploaded to,
 # either MEDIA_ROOT + 'galleries', or filebrowser's upload
@@ -56,10 +76,12 @@ class BaseGallery(models.Model):
         super(BaseGallery, self).save(*args, **kwargs)
         if self.zip_import:
             zip_file = ZipFile(self.zip_import)
+            timezone = pytz.timezone(settings.TIME_ZONE)
+
             for name in zip_file.namelist():
                 data = zip_file.read(name)
+                image = None
                 try:
-                    from PIL import Image
                     image = Image.open(BytesIO(data))
                     image.load()
                     image = Image.open(BytesIO(data))
@@ -69,6 +91,20 @@ class BaseGallery(models.Model):
                 except:
                     continue
                 name = os.path.split(name)[1]
+
+                exif_data = None
+                exif_date = None
+                try:
+                    exif_data = get_exif(image)
+                    
+                    date_time = datetime.datetime.strptime(
+                        exif_data.get('DateTime') or exif_data.get('DateTimeOriginal'),
+                        '%Y:%m:%d %H:%M:%S')
+                    exif_date = timezone.localize(date_time)
+                except Exception as e:
+                    logger.info('Unable to parse EXIF date from {} - {}'.format(
+                        name, e
+                    ))
 
                 # In python3, name is a string. Convert it to bytes.
                 if not isinstance(name, bytes):
@@ -105,7 +141,11 @@ class BaseGallery(models.Model):
                     path = os.path.join(GALLERIES_UPLOAD_DIR, slug,
                                         native(str(name, errors="ignore")))
                     saved_path = default_storage.save(path, ContentFile(data))
-                self.images.create(file=saved_path)
+                self.images.create(
+                    file=saved_path,
+                    exif_data=exif_data,
+                    exif_date=exif_date
+                )
             if delete_zip_import:
                 zip_file.close()
                 self.zip_import.delete(save=True)
@@ -129,6 +169,9 @@ class GalleryImage(Orderable):
         upload_to=upload_to("galleries.GalleryImage.file", "galleries"))
     description = models.CharField(_("Description"), max_length=1000,
                                                            blank=True)
+
+    exif_date = models.DateTimeField(null=True)
+    exif_data = JSONField(null=True)
 
     class Meta:
         verbose_name = _("Image")
