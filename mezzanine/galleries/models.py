@@ -98,7 +98,7 @@ class BaseGallery(models.Model):
                     exif_data = get_exif(image)
                     
                     date_time = datetime.datetime.strptime(
-                        exif_data.get('DateTime') or exif_data.get('DateTimeOriginal'),
+                        exif_data.get('DateTimeOriginal') or exif_data.get('DateTime'),
                         '%Y:%m:%d %H:%M:%S')
                     exif_date = timezone.localize(date_time)
                 except Exception as e:
