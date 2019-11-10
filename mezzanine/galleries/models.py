@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 from future.builtins import str
 from future.utils import native
 
+import json
 import base64
 import logging
 import pytz
@@ -32,15 +33,28 @@ from mezzanine.utils.models import upload_to
 
 logger = logging.getLogger(__name__)
 
+def as_serializable(field):
+    try:
+        json.dumps(field)
+
+        return field
+    except TypeError:
+        encoded = base64.b64encode(value).decode('ascii')
+        json.dumps(encoded)
+
+        return encoded
+
 def get_exif(image):
     result = {}
     info = image._getexif()
     for tag, value in info.items():
         decoded = TAGS.get(tag, tag)
-        if isinstance(value, bytes):
-            result[decoded] = base64.b64encode(value).decode('utf-8')
-        else:
-            result[decoded] = value
+        try:
+            # import pdb; pdb.set_trace()
+            result[decoded] = as_serializable(value)
+        except:
+            print('Couldn\'t serialize to JSON {} - {}'.format(decoded, value))
+            continue
     return result
 
 # Set the directory where gallery images are uploaded to,
